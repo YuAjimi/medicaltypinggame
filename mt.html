@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>医学用語タイピングゲーム</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f0f4f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            color: #333;
+        }
+
+        .game-container {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            text-align: center;
+            width: 90%;
+            max-width: 600px;
+            position: relative;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+            color: #7f8c8d;
+        }
+
+        /* 日本語の問題表示 */
+        #question-display {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin: 30px 0;
+            min-height: 60px;
+            color: #2980b9;
+        }
+
+        /* 英語の入力欄（表示用） */
+        #answer-display {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 2rem;
+            letter-spacing: 5px;
+            margin: 20px 0;
+            min-height: 50px;
+            color: #34495e;
+        }
+
+        .correct-char {
+            color: #27ae60;
+        }
+
+        .placeholder {
+            color: #bdc3c7;
+        }
+
+        /* メッセージエリア */
+        #message {
+            height: 30px;
+            font-weight: bold;
+            color: #e74c3c;
+        }
+
+        /* スタートボタン */
+        #start-btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        #start-btn:hover {
+            background-color: #2980b9;
+        }
+
+        /* モバイル対応用：見えない入力欄 */
+        #hidden-input {
+            opacity: 0;
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 100%;
+            cursor: default;
+            z-index: 10;
+        }
+
+        /* アニメーション */
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+            100% { transform: translateX(0); }
+        }
+
+        .shake {
+            animation: shake 0.3s;
+            color: #e74c3c !important;
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <h1>Medical Typing</h1>
+    
+    <div class="stats">
+        <span>Score: <span id="score">0</span></span>
+        <span>Count: <span id="count">0</span>/10</span>
+    </div>
+
+    <div id="question-display">Press Start</div>
+    
+    <div id="answer-display"></div>
+    
+    <div id="message"></div>
+
+    <button id="start-btn" onclick="startGame()">Start Game</button>
+
+    <input type="text" id="hidden-input" autocomplete="off" style="display:none;">
+</div>
+
+<script>
+    // === 問題データ（ここを編集して単語を追加・変更できます） ===
+    const wordList = [
+        { ja: "高血圧", en: "hypertension" },
+        { ja: "糖尿病", en: "diabetes" },
+        { ja: "抗生物質", en: "antibiotic" },
+        { ja: "肺炎", en: "pneumonia" },
+        { ja: "骨折", en: "fracture" },
+        { ja: "麻酔", en: "anesthesia" },
+        { ja: "心筋梗塞", en: "infarction" },
+        { ja: "症状", en: "symptom" },
+        { ja: "診断", en: "diagnosis" },
+        { ja: "処方箋", en: "prescription" },
+        { ja: "炎症", en: "inflammation" },
+        { ja: "外科", en: "surgery" },
+        { ja: "ワクチン", en: "vaccine" },
+        { ja: "アレルギー", en: "allergy" },
+        { ja: "救急車", en: "ambulance" }
+    ];
+
+    // === ゲームの状態管理 ===
+    let currentWordObj = {};
+    let currentIndex = 0; // 現在入力中の文字の位置
+    let score = 0;
+    let questionCount = 0;
+    const maxQuestions = 10;
+    let isPlaying = false;
+
+    // === DOM要素の取得 ===
+    const questionEl = document.getElementById('question-display');
+    const answerEl = document.getElementById('answer-display');
+    const scoreEl = document.getElementById('score');
+    const countEl = document.getElementById('count');
+    const messageEl = document.getElementById('message');
+    const startBtn = document.getElementById('start-btn');
+    const hiddenInput = document.getElementById('hidden-input');
+
+    // === ゲーム開始処理 ===
+    function startGame() {
+        score = 0;
+        questionCount = 0;
+        isPlaying = true;
+        scoreEl.innerText = score;
+        startBtn.style.display = 'none';
+        
+        // モバイル対応：隠し入力欄を表示してフォーカス
+        hiddenInput.style.display = 'block';
+        hiddenInput.focus();
+        
+        nextQuestion();
+    }
+
+    // === 次の問題へ ===
+    function nextQuestion() {
+        if (questionCount >= maxQuestions) {
+            endGame();
+            return;
+        }
+
+        // ランダムに単語を選択
+        const randomIndex = Math.floor(Math.random() * wordList.length);
+        currentWordObj = wordList[randomIndex];
+        
+        // 状態のリセット
+        currentIndex = 0;
+        questionCount++;
+        countEl.innerText = questionCount;
+        
+        // 画面表示の更新
+        questionEl.innerText = currentWordObj.ja;
+        messageEl.innerText = "";
+        hiddenInput.value = ""; // 入力欄リセット
+        
+        updateDisplay();
+    }
+
+    // === 画面描画の更新（文字とアンダースコア） ===
+    function updateDisplay() {
+        const targetWord = currentWordObj.en;
+        let html = '';
+
+        for (let i = 0; i < targetWord.length; i++) {
+            if (i < currentIndex) {
+                // 正解済みの文字
+                html += `<span class="correct-char"></span>`;
+            } else {
+                // 未入力の文字（ヒントとしてのアンダースコア）
+                html += `<span class="placeholder">_</span>`;
+            }
+        }
+        answerEl.innerHTML = html;
+    }
+
+    // === ゲーム終了処理 ===
+    function endGame() {
+        isPlaying = false;
+        questionEl.innerText = "Game Over!";
+        answerEl.innerHTML = `Final Score: `;
+        startBtn.innerText = "Replay";
+        startBtn.style.display = 'inline-block';
+        hiddenInput.blur();
+        hiddenInput.style.display = 'none';
+    }
+
+    // === キー入力イベントのハンドリング ===
+    // PCとスマホ両対応のため、隠しinputへの入力を監視
+    hiddenInput.addEventListener('input', (e) => {
+        if (!isPlaying) return;
+
+        const inputVal = hiddenInput.value;
+        // 入力が空の場合は無視（バックスペースなど）
+        if (inputVal.length === 0) return;
+
+        // 最後に入力された文字を取得
+        const charCode = inputVal.slice(-1).toLowerCase();
+        
+        // 入力欄をクリア（常に次の1文字だけを受け付けるため）
+        hiddenInput.value = "";
+
+        checkInput(charCode);
+    });
+
+    // PC用：キーボードイベントも監視（よりレスポンスが良い）
+    document.addEventListener('keydown', (e) => {
+        if (!isPlaying) return;
+        
+        // アルファベットキーのみ反応させる
+        if (e.key.length === 1 && e.key.match(/[a-zA-Z]/)) {
+            hiddenInput.focus(); // フォーカス外れ防止
+            checkInput(e.key.toLowerCase());
+        }
+    });
+
+    // === 入力判定ロジック ===
+    function checkInput(key) {
+        const targetChar = currentWordObj.en[currentIndex].toLowerCase();
+
+        if (key === targetChar) {
+            // 正解
+            currentIndex++;
+            updateDisplay();
+
+            // 単語完成チェック
+            if (currentIndex >= currentWordObj.en.length) {
+                score += 10;
+                scoreEl.innerText = score;
+                messageEl.innerText = "Great!";
+                messageEl.style.color = "#27ae60";
+                
+                // 少し待ってから次の問題へ
+                setTimeout(nextQuestion, 500);
+            }
+        } else {
+            // 不正解
+            answerEl.classList.add('shake');
+            messageEl.innerText = "Miss!";
+            messageEl.style.color = "#e74c3c";
+            
+            // アニメーション除去
+            setTimeout(() => {
+                answerEl.classList.remove('shake');
+            }, 300);
+        }
+    }
+
+    // 画面のどこをクリックしても入力欄にフォーカス（スマホ対策）
+    document.querySelector('.game-container').addEventListener('click', () => {
+        if (isPlaying) hiddenInput.focus();
+    });
+
+</script>
+
+</body>
+</html>
