@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta property="og:title" content="解剖学タイピング">
+    <meta property="og:description" content="医学生・医療従事者向け。解剖学用語のタイピング練習ゲーム。">
+    <meta property="og:type" content="website">
+
+    <title>解剖学タイピングゲーム</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f0f4f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            color: #333;
+        }
+
+        .game-container {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            text-align: center;
+            width: 90%;
+            max-width: 600px;
+            position: relative;
+            overflow: hidden; /* 隠し入力欄がはみ出ないように */
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+            color: #7f8c8d;
+        }
+
+        /* 日本語の問題表示 */
+        #question-display {
+            font-size: 2.2rem;
+            font-weight: bold;
+            margin: 25px 0 15px;
+            min-height: 50px;
+            color: #2980b9;
+        }
+
+        /* 打った文字の表示エリア（新設） */
+        #user-input-display {
+            font-size: 1rem;
+            color: #555;
+            height: 25px;
+            margin-bottom: 10px;
+            font-family: 'Courier New', monospace;
+        }
+        #last-char {
+            font-weight: bold;
+            color: #e67e22;
+            font-size: 1.2rem;
+        }
+
+        /* 英語の入力欄（表示用） */
+        #answer-display {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 2rem;
+            letter-spacing: 3px;
+            margin: 15px 0 25px;
+            min-height: 45px;
+            color: #34495e;
+            word-break: break-all; /* 長い単語で折り返す */
+        }
+
+        .correct-char {
+            color: #27ae60;
+        }
+
+        .placeholder {
+            color: #bdc3c7;
+        }
+
+        /* メッセージエリア */
+        #message {
+            height: 30px;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        /* スタートボタン */
+        #start-btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+            z-index: 20; /* 入力欄より前に */
+            position: relative;
+        }
+
+        #start-btn:hover {
+            background-color: #2980b9;
+        }
+
+        /* 入力を受け付けるための隠し要素（PC/スマホ共通） */
+        #hidden-input {
+            opacity: 0;
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 100%;
+            cursor: default;
+            z-index: 10; /* コンテンツの上に被せる */
+            font-size: 1px; /* モバイルでの拡大防止 */
+        }
+        
+        /* ゲーム終了時のオーバーレイ */
+        #game-over-overlay {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255,255,255,0.9);
+            z-index: 30;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-radius: 15px;
+        }
+
+        /* アニメーション */
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            20% { transform: translateX(-8px); }
+            40% { transform: translateX(8px); }
+            60% { transform: translateX(-8px); }
+            80% { transform: translateX(8px); }
+            100% { transform: translateX(0); }
+        }
+
+        .shake {
+            animation: shake 0.4s;
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <h1>Anatomy Typing</h1>
+    
+    <div class="stats">
+        <span>Score: <span id="score">0</span></span>
+        <span>Count: <span id="count">0</span>/10</span>
+    </div>
+
+    <div id="question-display">Press Start</div>
+    
+    <div id="user-input-display">あなたが打ったキー: <span id="last-char"> </span></div>
+
+    <div id="answer-display"></div>
+    
+    <div id="message"></div>
+
+    <button id="start-btn" onclick="startGame()">Start Game</button>
+
+    <div id="game-over-overlay">
+        <h2 id="final-message" style="color: #2c3e50;">Game Over!</h2>
+        <p id="final-score" style="font-size: 1.5rem; margin: 20px 0;"></p>
+        <button id="replay-btn" onclick="startGame()" style="background-color: #27ae60; color: white; border: none; padding: 10px 25px; font-size: 1.1rem; border-radius: 5px; cursor: pointer;">Replay</button>
+    </div>
+
+    <input type="text" id="hidden-input" autocomplete="off" spellcheck="false">
+</div>
+
+<script>
+    // === 解剖学中心の単語データ ===
+    const wordList = [
+        { ja: "頭蓋骨", en: "skull" },
+        { ja: "下顎骨", en: "mandible" },
+        { ja: "鎖骨", en: "clavicle" },
+        { ja: "肩甲骨", en: "scapula" },
+        { ja: "上腕骨", en: "humerus" },
+        { ja: "橈骨 (とうこつ)", en: "radius" },
+        { ja: "尺骨 (しゃっこつ)", en: "ulna" },
+        { ja: "大腿骨", en: "femur" },
+        { ja: "膝蓋骨 (ひざざら)", en: "patella" },
+        { ja: "脛骨 (けいこつ)", en: "tibia" },
+        { ja: "腓骨 (ひこつ)", en: "fibula" },
+        { ja: "肋骨", en: "rib" },
+        { ja: "脊椎", en: "vertebra" },
+        { ja: "骨盤", en: "pelvis" },
+        { ja: "筋肉", en: "muscle" },
+        { ja: "上腕二頭筋", en: "biceps" },
+        { ja: "大胸筋", en: "pectoralis" },
+        { ja: "心臓", en: "heart" },
+        { ja: "肺", en: "lung" },
+        { ja: "肝臓", en: "liver" },
+        { ja: "腎臓", en: "kidney" },
+        { ja: "胃", en: "stomach" },
+        { ja: "小腸", en: "small intestine" },
+        { ja: "大腸", en: "large intestine" },
+        { ja: "膵臓 (すいぞう)", en: "pancreas" },
+        { ja: "血管", en: "blood vessel" },
+        { ja: "動脈", en: "artery" },
+        { ja: "静脈", en: "vein" },
+        { ja: "神経", en: "nerve" },
+        { ja: "脳", en: "brain" }
+    ];
+
+    // === ゲームの状態管理 ===
+    let currentWordObj = {};
+    let currentIndex = 0;
+    let score = 0;
+    let questionCount = 0;
+    const maxQuestions = 10;
+    let isPlaying = false;
+    let isProcessing = false; // 連打防止用フラグ
+
+    // === DOM要素の取得 ===
+    const questionEl = document.getElementById('question-display');
+    const answerEl = document.getElementById('answer-display');
+    const scoreEl = document.getElementById('score');
+    const countEl = document.getElementById('count');
+    const messageEl = document.getElementById('message');
+    const startBtn = document.getElementById('start-btn');
+    const hiddenInput = document.getElementById('hidden-input');
+    const lastCharEl = document.getElementById('last-char');
+    const gameOverOverlay = document.getElementById('game-over-overlay');
+    const finalScoreEl = document.getElementById('final-score');
+
+    // === ゲーム開始処理 ===
+    function startGame() {
+        score = 0;
+        questionCount = 0;
+        isPlaying = true;
+        isProcessing = false;
+        scoreEl.innerText = score;
+        startBtn.style.display = 'none';
+        gameOverOverlay.style.display = 'none';
+        
+        // 隠し入力欄にフォーカス
+        hiddenInput.value = "";
+        hiddenInput.focus();
+        
+        nextQuestion();
+    }
+
+    // === 次の問題へ ===
+    function nextQuestion() {
+        if (questionCount >= maxQuestions) {
+            endGame();
+            return;
+        }
+
+        const randomIndex = Math.floor(Math.random() * wordList.length);
+        currentWordObj = wordList[randomIndex];
+        
+        currentIndex = 0;
+        questionCount++;
+        countEl.innerText = questionCount;
+        
+        questionEl.innerText = currentWordObj.ja;
+        messageEl.innerText = "";
+        lastCharEl.innerText = " "; // 打った文字の表示をクリア
+        isProcessing = false;
+        
+        updateDisplay();
+        // 次の問題に移った後も確実にフォーカスを維持
+        setTimeout(() => hiddenInput.focus(), 10);
+    }
+
+    // === 画面描画の更新 ===
+    function updateDisplay() {
+        const targetWord = currentWordObj.en;
+        let html = '';
+
+        for (let i = 0; i < targetWord.length; i++) {
+            const char = targetWord[i];
+            if (i < currentIndex) {
+                html += `<span class="correct-char">${char === ' ' ? '&nbsp;' : char}</span>`;
+            } else {
+                html += `<span class="placeholder">${char === ' ' ? '&nbsp;' : '_'}</span>`;
+            }
+        }
+        answerEl.innerHTML = html;
+    }
+
+    // === ゲーム終了処理 ===
+    function endGame() {
+        isPlaying = false;
+        finalScoreEl.innerText = `Your Final Score: ${score}`;
+        gameOverOverlay.style.display = 'flex';
+        hiddenInput.blur();
+    }
+
+    // === 入力イベントのハンドリング (修正版: PC/スマホ一本化) ===
+    hiddenInput.addEventListener('input', (e) => {
+        if (!isPlaying || isProcessing) return;
+
+        const inputVal = hiddenInput.value;
+        if (inputVal.length === 0) return;
+
+        // 入力された最後の1文字を取得して小文字化
+        const rawChar = inputVal.slice(-1);
+        const charCode = rawChar.toLowerCase();
+        
+        // 入力欄を即座にクリアして次の入力に備える
+        hiddenInput.value = "";
+
+        // アルファベットとスペース以外は無視
+        if (!charCode.match(/[a-z ]/)) return;
+
+        // 打った文字を画面に表示
+        lastCharEl.innerText = rawChar;
+
+        checkInput(charCode);
+    });
+
+    // === 入力判定ロジック ===
+    function checkInput(key) {
+        // 現在のターゲット文字を取得（スペースも含む）
+        const targetChar = currentWordObj.en[currentIndex].toLowerCase();
+
+        if (key === targetChar) {
+            // 正解
+            currentIndex++;
+            updateDisplay();
+            messageEl.innerText = "";
+
+            // 単語完成チェック
+            if (currentIndex >= currentWordObj.en.length) {
+                isProcessing = true; // 次の問題への切り替え中は入力を受け付けない
+                score += 10;
+                scoreEl.innerText = score;
+                messageEl.innerText = "Excellent!";
+                messageEl.style.color = "#27ae60";
+                
+                setTimeout(nextQuestion, 800);
+            }
+        } else {
+            // 不正解
+            triggerMissEffect();
+        }
+    }
+
+    // ミス時の演出
+    function triggerMissEffect() {
+        answerEl.classList.remove('shake'); // アニメーションをリセット
+        void answerEl.offsetWidth; // リフローを強制してアニメーションを再始動
+        answerEl.classList.add('shake');
+        
+        messageEl.innerText = "Miss!";
+        messageEl.style.color = "#e74c3c";
+    }
+
+    // 画面のどこをクリックしても入力欄にフォーカスを戻す
+    document.querySelector('.game-container').addEventListener('click', () => {
+        if (isPlaying && !isProcessing) hiddenInput.focus();
+    });
+
+    // 常にフォーカスを維持しようとする（スマホでのキーボード閉じ対策）
+    hiddenInput.addEventListener('blur', () => {
+       if(isPlaying && !isProcessing) {
+           setTimeout(() => hiddenInput.focus(), 10);
+       }
+    });
+
+</script>
+
+</body>
+</html>
